@@ -11,8 +11,6 @@ public class SpaceShipController : MonoBehaviour
     [SerializeField] private float maxLinearVelocity;
     [SerializeField] private float maxAngularVelocity;
 
-    [SerializeField] private float stabilizationDuration;
-
     private InputSystemActions.SpaceshipActions actions;
     private Rigidbody rb;
 
@@ -45,35 +43,31 @@ public class SpaceShipController : MonoBehaviour
         Debug.Log($"{rb.linearVelocity} {rb.angularVelocity}");
 
         if (Input.GetKeyDown(KeyCode.Q))
-            StartCoroutine(Stabilize());
+            Stabilize();
     }
 
     // Stabilize ship
-    private IEnumerator Stabilize()
+    private void Stabilize()
     {
-        float elapsed = 0.0f;
+        rb.angularVelocity = Vector3.zero;
+        rb.linearDamping = 5.0f;
+        Invoke(nameof(ResetDamping), 2.0f);
+    }
 
-        Vector3 targetLinearVelocity = rb.linearVelocity / 2.0f;
-        Vector3 targetAngularVelocity = Vector3.zero;
-
-        while (stabilizationDuration > elapsed)
-        {
-            float deltaDuration = elapsed / stabilizationDuration;
-            elapsed += Time.deltaTime;
-
-            rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, targetAngularVelocity, deltaDuration);
-            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, targetLinearVelocity, deltaDuration);
-
-            if (rb.angularVelocity == targetAngularVelocity || rb.linearVelocity == targetLinearVelocity)
-                yield break;
-
-            yield return null;
-        }
+    void ResetDamping()
+    {
+        rb.linearDamping = 0.0f;
     }
 
     private void Move(float horizontal)
     {
-        Vector3 force = speed * Time.deltaTime * horizontal * rb.transform.TransformDirection(Vector3.forward);
+        if (horizontal == 0.0f)
+            return;
+
+        Vector3 forward = transform.TransformDirection(Vector3.forward);
+        Vector3 force = speed * Time.deltaTime * horizontal * forward;
+
+        rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, force, 1.0f);
         rb.AddForce(force, ForceMode.VelocityChange);
     }
 
@@ -81,10 +75,12 @@ public class SpaceShipController : MonoBehaviour
     {
         float deltaRotationSpeed = rotationSpeed * Time.deltaTime;
 
-        Vector3 rotationX = deltaRotationSpeed * horizontal * rb.transform.up;
-        Vector3 rotationY = deltaRotationSpeed * -vertical  * rb.transform.right;
-        Vector3 rotationZ = deltaRotationSpeed * roll       * rb.transform.forward;
+        Vector3 x = -vertical  * transform.TransformDirection(Vector3.right);
+        Vector3 y = horizontal * transform.TransformDirection(Vector3.up);
+        Vector3 z = roll       * transform.TransformDirection(Vector3.forward);
+        
+        Vector3 rotation = x + y + z;
 
-        rb.AddTorque(rotationX + rotationY + rotationZ, ForceMode.VelocityChange);
+        rb.AddTorque(deltaRotationSpeed * rotation, ForceMode.VelocityChange);
     }
 }
